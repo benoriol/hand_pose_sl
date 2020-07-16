@@ -5,6 +5,8 @@ import open3d as o3d
 import pygame
 from transforms3d.axangles import axangle2mat
 
+import os
+
 import config
 from capture import OpenCVCapture
 from hand_mesh import HandMesh
@@ -17,10 +19,13 @@ from matplotlib import pyplot as plt
 
 import glob
 
-def write_rendered_frame(writer, viewer):
-  viewer.capture_screen_image("kk_tmp.jpg")
+def write_rendered_frame(writer, viewer, output_frame_folder, i):
+
+  frame_path = output_frame_folder + "/" + "{:06d}".format(i) + '.jpg'
+
+  viewer.capture_screen_image(frame_path)
+  print(frame_path)
   rendered_frame = cv2.imread("kk_tmp.jpg")
-  print(rendered_frame.shape)
 
   writer.write(rendered_frame)
 
@@ -85,13 +90,19 @@ def live_application(capture):
   # image_paths = glob.glob("samples_benet/casa/*")
 
   input_video_path = "../How2Sign/utterance_level/train/rgb_front/features/hand_video/1eFlDHpjPNI_7-8-rgb_front.mp4"
+  output_video_path = "../How2Sign/utterance_level/train/rgb_front/features/hand_pose_video/1eFlDHpjPNI_7-8-rgb_front.mp4"
+  output_frames_folder = "../How2Sign/utterance_level/train/rgb_front/features/hand_pose_frames/1eFlDHpjPNI_7-8-rgb_front"
+
+  os.system("mkdir " + output_frames_folder)
+
   cap = cv2.VideoCapture(input_video_path)
   length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+  fps = cap.get(cv2.CAP_PROP_FPS)
 
   # for inputpath in image_paths:
   # for i in range(length):
 
-  writer = cv2.VideoWriter("kk.mp4", cv2.VideoWriter_fourcc(*'PIM1'), 25,
+  writer = cv2.VideoWriter("kk.mp4", cv2.VideoWriter_fourcc(*'PIM1'), fps,
                            (1081, 731))
 
   for i in range(length):
@@ -136,7 +147,7 @@ def live_application(capture):
 
     viewer.poll_events()
 
-    write_rendered_frame(writer, viewer)
+    write_rendered_frame(writer, viewer, output_frames_folder, i)
 
     display.blit(
       pygame.surfarray.make_surface(
@@ -148,10 +159,10 @@ def live_application(capture):
     )
     pygame.display.update()
     # pygame.image.save(display, "kk.jpeg")
-    if keyboard.is_pressed("esc"):
-      break
+    # if keyboard.is_pressed("esc"):
+    #   break
 
-    clock.tick(30)
+    # clock.tick(30)
 
 if __name__ == '__main__':
   # live_application(OpenCVCapture())
