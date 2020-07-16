@@ -54,7 +54,7 @@ def plot_points(frame, points):
 def get_hand_center(input_json):
     '''
     Returs the computed hand center given the hand keypoints. Implemented as
-    average of MP joints p
+    average of MP joints points
     :param input_json:
     :return:
     '''
@@ -120,7 +120,7 @@ def crop_video_main():
 
     n = 0
 
-    writer = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc(*'PIM1'), 24, (200, 200))
+    writer = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc(*'PIM1'), fps, (200, 200))
     while (cap.isOpened()):
         ret, frame_large = cap.read()
 
