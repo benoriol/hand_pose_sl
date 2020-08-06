@@ -18,6 +18,7 @@ from utils import *
 from matplotlib import pyplot as plt
 
 import glob
+import pickle
 
 def write_rendered_frame(writer, viewer, output_frame_folder, i):
 
@@ -25,7 +26,7 @@ def write_rendered_frame(writer, viewer, output_frame_folder, i):
 
   viewer.capture_screen_image(frame_path)
   print(frame_path)
-  rendered_frame = cv2.imread("kk_tmp.jpg")
+  rendered_frame = cv2.imread(frame_path)
 
   writer.write(rendered_frame)
 
@@ -89,9 +90,10 @@ def live_application(capture):
   model = ModelPipeline()
   # image_paths = glob.glob("samples_benet/casa/*")
 
-  input_video_path = "../How2Sign/utterance_level/train/rgb_front/features/hand_video/1eFlDHpjPNI_7-8-rgb_front.mp4"
-  output_video_path = "../How2Sign/utterance_level/train/rgb_front/features/hand_pose_video/1eFlDHpjPNI_7-8-rgb_front.mp4"
-  output_frames_folder = "../How2Sign/utterance_level/train/rgb_front/features/hand_pose_frames/1eFlDHpjPNI_7-8-rgb_front"
+  input_video_path = "../How2Sign/utterance_level/train/rgb_front/features/hand_video/CVmyQR31Dr4_5-3-rgb_front.mp4"
+  output_video_path = "../How2Sign/utterance_level/train/rgb_front/features/hand_pose_video/CVmyQR31Dr4_5-3-rgb_front.mp4"
+  output_frames_folder = "../How2Sign/utterance_level/train/rgb_front/features/hand_pose_frames/CVmyQR31Dr4_5-3-rgb_front"
+  output_pose_file = "../How2Sign/utterance_level/train/rgb_front/features/hand_pose/CVmyQR31Dr4_5-3-rgb_front.pickle"
 
   os.system("mkdir " + output_frames_folder)
 
@@ -102,8 +104,10 @@ def live_application(capture):
   # for inputpath in image_paths:
   # for i in range(length):
 
-  writer = cv2.VideoWriter("kk.mp4", cv2.VideoWriter_fourcc(*'PIM1'), fps,
+  writer = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'PIM1'), fps,
                            (1081, 731))
+
+  pose_data = []
 
   for i in range(length):
     # frame_large = capture.read()
@@ -132,6 +136,9 @@ def live_application(capture):
 
     _, theta_mpii = model.process(frame)
     theta_mano = mpii_to_mano(theta_mpii)
+
+    pose_data.append(theta_mano)
+
 
     v = hand_mesh.set_abs_quat(theta_mano)
     v *= 2 # for better visualization
@@ -163,6 +170,9 @@ def live_application(capture):
     #   break
 
     # clock.tick(30)
+
+  with open(output_pose_file, "wb") as output:
+    pickle.dump(pose_data, output)
 
 if __name__ == '__main__':
   # live_application(OpenCVCapture())

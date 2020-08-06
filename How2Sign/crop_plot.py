@@ -108,9 +108,9 @@ def crop_image_main():
 def crop_video_main():
 
 
-    input_video_path = "utterance_level/train/rgb_front/raw_videos/fxIoWLKHOuo_4-3-rgb_front.mp4"
-    input_json_folder = "utterance_level/train/rgb_front/features/json/fxIoWLKHOuo_4-3-rgb_front"
-    output_file = "utterance_level/train/rgb_front/features/hand_video/fxIoWLKHOuo_4-3-rgb_front.mp4"
+    input_video_path = "utterance_level/train/rgb_front/features/video/CVmyQR31Dr4_5-3-rgb_front.mp4"
+    input_json_folder = "utterance_level/train/rgb_front/features/json/CVmyQR31Dr4_5-3-rgb_front"
+    output_file = "utterance_level/train/rgb_front/features/hand_openpose_video/CVmyQR31Dr4_5-3-rgb_front.mp4"
     utt_id = input_video_path.split("/")[-1].replace(".mp4", "")
     print(utt_id)
     cap = cv2.VideoCapture(input_video_path)
