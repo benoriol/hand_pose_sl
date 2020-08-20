@@ -8,6 +8,7 @@ from steps import train
 import os
 import pickle
 
+from .steps.utils import add_transformer_args
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--exp", type=str, default="../exp/default_exp")
@@ -21,14 +22,19 @@ parser.add_argument("--model", type=str, default="ConvModel")
 parser.add_argument("--num-epochs", type=int, default=100)
 parser.add_argument("-b", "--batch-size", type=int, default=20)
 
+parser.add_argument("--print-every", type=int, default=100)
+
 
 
 
 if __name__ == '__main__':
 
     args = parser.parse_args()
+    args = add_transformer_args(args)
+
 
     train_dataset = TextPoseDataset(args.train_data, args.max_frames)
+
     valid_dataset = TextPoseDataset(args.valid_data, args.max_frames)
 
     train_dataloader =DataLoader(train_dataset, batch_size=args.batch_size)
@@ -39,10 +45,13 @@ if __name__ == '__main__':
     if os.path.isdir(args.exp):
         raise Exception("Experiment name "+ args.exp +" already exists.")
 
+
     os.mkdir(args.exp)
+    os.mkdir(args.exp + "/checkpoints")
 
     with open(args.exp + "/args.pckl", "wb") as f:
         pickle.dump(args, f)
+
 
     train(model, train_dataloader, valid_dataloader, args)
 

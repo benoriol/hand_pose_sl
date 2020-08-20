@@ -25,12 +25,16 @@ def train(model, train_loader, val_loader, args):
 
     train_loss_meter = AverageMeter()
 
+    n_iter = 0
 
+    print("Start epoch loop")
     for n in range(args.num_epochs):
 
         train_loss_meter.reset()
 
         for batch in train_loader:
+
+            print("Start loader loop")
 
             prediction = model(batch["body_kp"].to(device))
 
@@ -40,6 +44,11 @@ def train(model, train_loader, val_loader, args):
             optimizer.step()
 
             train_loss_meter.update(loss.item())
+
+            if n_iter % args.print_every == 0:
+                print("iteration: " + str(n_iter))
+            n_iter += 1
+
 
         validation_loss = validate(model, val_loader, criterion)
         total_time = time.time() - start_time

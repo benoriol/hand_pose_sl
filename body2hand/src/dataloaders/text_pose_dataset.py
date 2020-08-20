@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 
 from glob import glob
 import json
+import time
 
 
 BODY_HEAD_KEYPOINTS = [0, 1, 2, 3, 4, 5, 6, 7, 15, 16, 17, 18]
@@ -21,7 +22,9 @@ def format_keypoints(keypoints, n_dim=2):
 
 
 def load_keypoints(json_path):
+
     data = json.load(open(json_path))
+
 
     body_kp = format_keypoints(data["people"][0]["pose_keypoints_2d"])
     #Filer out legs
@@ -49,6 +52,8 @@ class TextPoseDataset(Dataset):
 
     def __getitem__(self, idx):
 
+        print("Start get item")
+
         metadata = self.data[idx]
 
         text = metadata["text"]
@@ -69,6 +74,8 @@ class TextPoseDataset(Dataset):
             "n_frames": metadata["n_frames"]
             #"text":metadata["text"]
         }
+
+
         for json_file in all_jsons:
             r_hand_kp, r_hand_conf, l_hand_kp, l_hand_conf, body_kp, body_conf = load_keypoints(json_file)
             item["body_kp"].append(body_kp)
