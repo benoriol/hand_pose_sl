@@ -42,17 +42,19 @@ def load_keypoints(json_path):
 
 
 class TextPoseDataset(Dataset):
-    def __init__(self, metadata_file, max_frames):
+    def __init__(self, metadata_file, max_frames, transform):
         super().__init__()
         self.data = json.load(open(metadata_file))
         self.max_frames = max_frames
+
+        self.transform = transform
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
 
-        print("Start get item")
+        #print("Start get item")
 
         metadata = self.data[idx]
 
@@ -74,6 +76,8 @@ class TextPoseDataset(Dataset):
             "n_frames": metadata["n_frames"]
             #"text":metadata["text"]
         }
+
+
 
 
         for json_file in all_jsons:
@@ -103,12 +107,15 @@ class TextPoseDataset(Dataset):
         item["left_hand_conf"] = item["left_hand_conf"][:self.max_frames]
 
         # To tensor
-        item["body_kp"] = torch.tensor(item["body_kp"])
-        item["right_hand_kp"] = torch.tensor(item["right_hand_kp"])
-        item["left_hand_kp"] = torch.tensor(item["left_hand_kp"])
-        item["body_conf"] = torch.tensor(item["body_conf"])
-        item["right_hand_conf"] = torch.tensor(item["right_hand_conf"])
-        item["left_hand_conf"] = torch.tensor(item["left_hand_conf"])
+        item["body_kp"] = torch.tensor(item["body_kp"]).float()
+        item["right_hand_kp"] = torch.tensor(item["right_hand_kp"]).float()
+        item["left_hand_kp"] = torch.tensor(item["left_hand_kp"]).float()
+        item["body_conf"] = torch.tensor(item["body_conf"]).float()
+        item["right_hand_conf"] = torch.tensor(item["right_hand_conf"]).float()
+        item["left_hand_conf"] = torch.tensor(item["left_hand_conf"]).float()
+
+        if self.transform:
+            item = self.transform(item)
 
         return item
 

@@ -1,5 +1,6 @@
 import pickle
 from fairseq import utils
+import torch
 
 
 class AverageMeter():
@@ -25,28 +26,37 @@ class ProgressSaver():
         self.progress = {
             "epoch":[],
             "train_loss":[],
+            "train_pix_dist":[],
             "val_loss":[],
+            "val_pix_dist": [],
             "time":[],
             "best_epoch":[],
             "best_val_loss":[]
             }
 
-    def update_epoch_progess(self, epoch, train_loss, val_loss, best_epoch, best_val_loss, time):
-        self.progress["epoch"].append(epoch)
-        self.progress["train_loss"].append(train_loss)
-        self.progress["val_loss"].append(val_loss)
-        self.progress["time"].append(time)
-        self.progress["best_epoch"].append(best_epoch)
-        self.progress["best_val_loss"].append(best_val_loss)
+    def update_epoch_progess(self, epoch_data):
 
-        with open("%s/progress.pkl" % self.exp_dir, "wb") as f:
+        for key in epoch_data.keys():
+            self.progress[key].append(epoch_data["key"])
+
+        # self.progress["epoch"].append(epoch_data["epoch"])
+        # self.progress["train_loss"].append(epoch_data["train_loss"])
+        # self.progress["val_loss"].append(epoch_data["val_loss"])
+        # self.progress["train_pix_dist"].append(epoch_data["train_pix_dist"])
+        # self.progress["val_pix_dist"].append(epoch_data["val_pix_dist"])
+        # self.progress["time"].append(epoch_data["time"])
+        # self.progress["best_epoch"].append(epoch_data["best_epoch"])
+        # self.progress["best_val_loss"].append(epoch_data["best_val_loss"])
+
+        with open("%s/progress.pckl" % self.exp_dir, "wb") as f:
             pickle.dump(self.progress, f)
 
 
-def print_epoch(epoch, train_loss, val_loss, time):
+def print_epoch(epoch, train_loss, train_pix_dist, val_loss, val_pix_dist, time):
 
-    print("Epoch #" + str(epoch) + ":\tTrain loss " + str(train_loss) +
-          "\tValid loss: " + str(val_loss) + "\tTime: " + str(time))
+    print("Epoch #" + str(epoch) + ":\tTrain loss: " + str(train_loss) +"\tValid loss: " + str(val_loss) +
+          "\n\t Train pix dist: " + str(train_pix_dist) + "\tValid pix dist: " + str(val_pix_dist) +
+          "\n\tTime: " + str(time))
 
 def add_transformer_args(parser):
     """Add model-specific arguments to the parser."""
@@ -60,7 +70,8 @@ def add_transformer_args(parser):
     parser.add_argument('--attention-dropout', type=float, metavar='D',
                         help='dropout probability for attention weights',
                         default=0.1)
-    parser.add_argument('--activation-dropout', '--relu-dropout', type=float,
+    parser.add_argument('--activation-dropout', '--relu-dropout',
+                        type=float,
                         metavar='D',
                         help='dropout probability after activation in FFN.',
                         default=0.1)
@@ -108,7 +119,8 @@ def add_transformer_args(parser):
     parser.add_argument('--adaptive-softmax-cutoff', metavar='EXPR',
                         help='comma separated list of adaptive softmax cutoff points. '
                              'Must be used with adaptive_loss criterion'),
-    parser.add_argument('--adaptive-softmax-dropout', type=float, metavar='D',
+    parser.add_argument('--adaptive-softmax-dropout', type=float,
+                        metavar='D',
                         help='sets adaptive softmax dropout for the tail projections')
     parser.add_argument('--layernorm-embedding', action='store_true',
                         help='add layernorm to embedding')
@@ -133,9 +145,11 @@ def add_transformer_args(parser):
     parser.add_argument('--decoder-layers-to-keep', default=None,
                         help='which layers to *keep* when pruning as a comma-separated list')
     # args for Training with Quantization Noise for Extreme Model Compression ({Fan*, Stock*} et al., 2020)
-    parser.add_argument('--quant-noise-pq', type=float, metavar='D', default=0,
+    parser.add_argument('--quant-noise-pq', type=float, metavar='D',
+                        default=0,
                         help='iterative PQ quantization noise at training time')
-    parser.add_argument('--quant-noise-pq-block-size', type=int, metavar='D',
+    parser.add_argument('--quant-noise-pq-block-size', type=int,
+                        metavar='D',
                         default=8,
                         help='block size of quantization noise at training time')
     parser.add_argument('--quant-noise-scalar', type=float, metavar='D',
@@ -147,3 +161,36 @@ def add_transformer_args(parser):
                         default=150)
     parser.add_argument('--adaptive-input', type=bool,
                         default=False)
+
+
+class NormalizeFixedFactor:
+    def __init__(self, factor):
+        self.factor = factor
+
+    def __call__(self, item):
+
+        item["body_kp"] = item["body_kp"] / self.factor
+        item["right_hand_kp"] = item["right_hand_kp"] / self.factor
+        item["left_hand_kp"] = item["left_hand_kp"] / self.factor
+
+        return item
+
+
+class MSE2Pixels:
+    def __init__(self, num_joints, upsample):
+        self.num_joints = num_joints
+        self.upsample = upsample
+
+    def __call__(self, mse):
+        pix = mse / self.num_joints
+        pix = pix ** (1/2)
+        pix = pix * self.upsample
+        return pix
+
+def adjust_learning_rate(base_lr, lr_decay, optimizer, epoch):
+    """Sets the learning rate to the initial LR decayed by 10 every lr_decay epochs"""
+    lr = base_lr * (0.1 ** (epoch // lr_decay))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+    return lr
