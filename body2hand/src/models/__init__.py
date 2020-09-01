@@ -1,1 +1,1 @@
-from .HandPoseModels import ConvModel, TransformerEncoder
+from .HandPoseModels import ConvModel, TransformerEncoder, ConvTransformerEncoder

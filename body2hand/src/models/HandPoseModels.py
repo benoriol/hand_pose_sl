@@ -15,13 +15,13 @@ from fairseq.modules import (
 )
 
 class ConvModel(nn.Module):
-    def __init__(self):
+    def __init__(self, conv_channels):
 
         super(ConvModel, self).__init__()
-        self.conv1 = nn.Conv1d(12 * 2 ,30, kernel_size=5, padding=2)
-        self.conv2 = nn.Conv1d(30, 30, kernel_size=5, padding=2)
-        self.conv3 = nn.Conv1d(30, 30, kernel_size=5, padding=2)
-        self.conv4 = nn.Conv1d(30, 2 * 21, kernel_size=5, padding=2)
+        self.conv1 = nn.Conv1d(12 * 2 ,conv_channels, kernel_size=5, padding=2)
+        self.conv2 = nn.Conv1d(conv_channels, conv_channels, kernel_size=5, padding=2)
+        self.conv3 = nn.Conv1d(conv_channels, conv_channels, kernel_size=5, padding=2)
+        self.conv4 = nn.Conv1d(conv_channels, 2 * 21, kernel_size=5, padding=2)
 
         self.relu = nn.ReLU()
 
@@ -157,21 +157,21 @@ class TransformerEncoder(nn.Module):
 
         # B x T x C -> T x B x C
         x = src_tokens
-
         batch_size, seq_len = (int(x.shape[0]), int(x.shape[1]))
-        print(batch_size, seq_len)
-
+        x = x.view(batch_size, seq_len, -1)
         x = x.transpose(0, 1)
-
-
 
         # compute padding mask
         # encoder_padding_mask = src_tokens.eq(self.padding_idx)
 
         encoder_padding_mask = torch.zeros(batch_size, seq_len, dtype=torch.uint8)
         encoder_padding_mask += 1
+
+        encoder_padding_mask = encoder_padding_mask.to(x.device)
+
         for i, len in enumerate(src_lengths):
             for j in range(len):
+                j -= 1
                 encoder_padding_mask[i, j] = 0
 
         encoder_states = [] if return_all_hiddens else None
@@ -297,4 +297,33 @@ class SinusoidalPositionalEmbedding(nn.Module):
         inp.cat(positional_embeddings, dim=2)
 
         return inp
+
+class ConvTransformerEncoder(nn.Module):
+    def __init__(self, args, emb_dim):
+        super(ConvTransformerEncoder, self).__init__()
+
+        self.transformerEncoder = TransformerEncoder(args, emb_dim)
+
+        self.conv1 = nn.Conv1d(12 * 2, 21 * 2, kernel_size=1)
+
+    def forward(self, x, src_lengths):
+        out = x.permute(0, 2, 3, 1)
+        bs, n_keypoints, dim, len = out.shape
+
+        out = out.view(bs, n_keypoints * dim, len)
+
+        out = self.conv1(out)
+        out = out.permute(0, 2, 1)
+        out = self.transformerEncoder(out, src_lengths)
+
+        # B x C x L -> B x L x C
+        # out = out.permute(0, 2, 1)
+        # out = out.view(bs, len, -1, dim)
+
+
+        out = out.encoder_out
+        out = out.permute(1, 0, 2)
+        out = out.view(bs, len, 21, dim)
+
+        return out
 

@@ -1,1 +1,1 @@
-from .text_pose_dataset import TextPoseDataset
+from .text_pose_dataset import TextPoseDataset, PoseDataset

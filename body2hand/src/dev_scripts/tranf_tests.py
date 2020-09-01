@@ -239,6 +239,9 @@ class TransformerEncoder(nn.Module):
         # x, encoder_embedding = self.forward_embedding(src_tokens)
 
         # B x T x C -> T x B x C
+
+        print(src_tokens.shape)
+
         x = src_tokens
 
         batch_size, seq_len = (int(x.shape[0]), int(x.shape[1]))

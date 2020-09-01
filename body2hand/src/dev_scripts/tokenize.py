@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     tokenizer = CharBPETokenizer()
 
-    tokenizer.train([args.corpus], vocab_size=10000)
+    tokenizer.train([args.corpus], vocab_size=1000)
 
     encoded = tokenizer.encode("I can feel the magic, can you?")
 

@@ -31,13 +31,14 @@ class ProgressSaver():
             "val_pix_dist": [],
             "time":[],
             "best_epoch":[],
-            "best_val_loss":[]
+            "best_val_loss":[],
+            "lr": []
             }
 
     def update_epoch_progess(self, epoch_data):
 
         for key in epoch_data.keys():
-            self.progress[key].append(epoch_data["key"])
+            self.progress[key].append(epoch_data[key])
 
         # self.progress["epoch"].append(epoch_data["epoch"])
         # self.progress["train_loss"].append(epoch_data["train_loss"])
@@ -66,26 +67,26 @@ def add_transformer_args(parser):
                         help='activation function to use',
                         default="relu")
     parser.add_argument('--dropout', type=float, metavar='D',
-                        help='dropout probability', default=0.1)
+                        help='dropout probability', default=0.0)
     parser.add_argument('--attention-dropout', type=float, metavar='D',
                         help='dropout probability for attention weights',
-                        default=0.1)
+                        default=0.0)
     parser.add_argument('--activation-dropout', '--relu-dropout',
                         type=float,
                         metavar='D',
                         help='dropout probability after activation in FFN.',
-                        default=0.1)
+                        default=0.0)
     parser.add_argument('--encoder-embed-path', type=str, metavar='STR',
                         help='path to pre-trained encoder embedding')
     parser.add_argument('--encoder-embed-dim', type=int, metavar='N',
-                        help='encoder embedding dimension', default=100)
+                        help='encoder embedding dimension', default=21*2)
     parser.add_argument('--encoder-ffn-embed-dim', type=int, metavar='N',
                         help='encoder embedding dimension for FFN',
                         default=100)
     parser.add_argument('--encoder-layers', type=int, metavar='N',
                         help='num encoder layers', default=4)
     parser.add_argument('--encoder-attention-heads', type=int, metavar='N',
-                        help='num encoder attention heads', default=4)
+                        help='num encoder attention heads', default=3)
     parser.add_argument('--encoder-normalize-before', action='store_true',
                         help='apply layernorm before each encoder block')
     parser.add_argument('--encoder-learned-pos', action='store_true',
@@ -189,8 +190,18 @@ class MSE2Pixels:
 
 def adjust_learning_rate(base_lr, lr_decay, optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every lr_decay epochs"""
-    lr = base_lr * (0.1 ** (epoch // lr_decay))
+    lr = base_lr * (0.1 ** (epoch / lr_decay))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
     return lr
+
+def mask_output(output, lengths):
+    for i, len in enumerate(lengths):
+
+        output[i, len:, :] = 0
+    return output
+
+
+def tensor2json(right_hand, left_hand, body):
+    
