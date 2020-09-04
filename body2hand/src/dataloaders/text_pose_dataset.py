@@ -7,6 +7,8 @@ import time
 from tokenizers import Tokenizer
 
 
+
+
 BODY_HEAD_KEYPOINTS = [0, 1, 2, 3, 4, 5, 6, 7, 15, 16, 17, 18]
 
 def format_keypoints(keypoints, n_dim=2):
@@ -60,6 +62,10 @@ class PoseDataset(Dataset):
 
         #print("Start get item")
 
+        # TODO: Get right and left hand
+        # TODO: Random crop of sequence instead of clipping
+        # TODO: Only load the ones that are going to be used
+
         metadata = self.data[idx]
 
         text = metadata["text"]
@@ -77,8 +83,9 @@ class PoseDataset(Dataset):
             "right_hand_conf":[],
             "left_hand_kp":[],
             "left_hand_conf":[],
-            "n_frames": min(metadata["n_frames"], self.max_frames)
-            #"text":metadata["text"]
+            "n_frames": min(metadata["n_frames"], self.max_frames),
+            "json_paths":[],
+            "text": metadata["text"]
         }
 
 
@@ -92,6 +99,7 @@ class PoseDataset(Dataset):
             item["body_conf"].append(body_conf)
             item["right_hand_conf"].append(r_hand_conf)
             item["left_hand_conf"].append(l_hand_conf)
+            item["json_paths"].append(json_file)
 
         # Pad sequence to max len
         while len(item["body_kp"]) < self.max_frames:
@@ -109,6 +117,7 @@ class PoseDataset(Dataset):
         item["body_conf"] = item["body_conf"][:self.max_frames]
         item["right_hand_conf"] = item["right_hand_conf"][:self.max_frames]
         item["left_hand_conf"] = item["left_hand_conf"][:self.max_frames]
+        item["json_paths"] = item["json_paths"][:self.max_frames]
 
         # To tensor
         item["body_kp"] = torch.tensor(item["body_kp"]).float()

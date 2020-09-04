@@ -1,6 +1,9 @@
 import pickle
 from fairseq import utils
 import torch
+import numpy as np
+
+from torch.utils.data.dataloader import default_collate
 
 
 class AverageMeter():
@@ -175,15 +178,16 @@ class NormalizeFixedFactor:
         item["left_hand_kp"] = item["left_hand_kp"] / self.factor
 
         return item
-
+    def denormalize_tensor(self, tensor):
+        return tensor * self.factor
 
 class MSE2Pixels:
     def __init__(self, num_joints, upsample):
         self.num_joints = num_joints
         self.upsample = upsample
 
-    def __call__(self, mse):
-        pix = mse / self.num_joints
+    def __call__(self, mse, len):
+        pix = mse / self.num_joints / len
         pix = pix ** (1/2)
         pix = pix * self.upsample
         return pix
@@ -204,4 +208,54 @@ def mask_output(output, lengths):
 
 
 def tensor2json(right_hand, left_hand, body):
-    
+    data_dict = {
+        "version": 1.3,
+        "people": []
+    }
+
+    person = {
+        "person_id": [-1],
+
+
+    }
+    right_hand = np.concatenate((right_hand, np.zeros((21, 1)) + 1.0), axis=1)
+    right_hand = np.reshape(right_hand, (-1))
+    right_hand = [float(x) for x in right_hand]
+
+    left_hand = np.concatenate((left_hand, np.zeros((21, 1)) + 1.0), axis=1)
+    left_hand = np.reshape(left_hand, (-1))
+    left_hand = [float(x) for x in left_hand]
+
+    body = np.concatenate((body, np.zeros((12, 1)) + 1.0), axis=1)
+    body = np.reshape(body, (-1))
+    body = [float(x) for x in body]
+
+    person["pose_keypoints_2d"] = body
+    person["hand_left_keypoints_2d"] = left_hand
+    person["hand_right_keypoints_2d"] = right_hand
+
+def array2open_pose(array, confidence=None):
+
+    if confidence==None:
+        confidence = np.zeros((21, 1)) + 1.0
+
+    array = np.concatenate((array, confidence), axis=1)
+    array = np.reshape(array, (-1))
+    array = [float(x) for x in array]
+
+    return array
+
+def collate_function(batch):
+
+    json_paths = [elem["json_paths"] for elem in batch]
+    texts = [elem["text"] for elem in batch]
+
+    for elem in  batch:
+        del elem["json_paths"]
+        del elem["text"]
+
+    batch = default_collate(batch)
+    batch["json_paths"] = json_paths
+    batch["text"] = texts
+
+    return batch

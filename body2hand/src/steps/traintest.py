@@ -4,9 +4,10 @@ import torch.nn as nn
 
 import numpy as np
 import time
+import json
 
 from .utils import AverageMeter, ProgressSaver, print_epoch, MSE2Pixels, adjust_learning_rate, \
-    mask_output
+    mask_output, array2open_pose
 
 def train(model, train_loader, val_loader, args):
 
@@ -149,30 +150,45 @@ def infer_utterance(model, loader, args):
     criterion = nn.MSELoss()
     loss_interpreter = MSE2Pixels(21, 1280)
 
+    with torch.no_grad():
 
-    for batch in loader:
-        batch["body_kp"] = batch["body_kp"].to(device)
-        batch["right_hand_kp"] = batch["right_hand_kp"].to(device)
-        input_lengths = batch["n_frames"]
+        for batch in loader:
+            batch["body_kp"] = batch["body_kp"].to(device)
+            batch["right_hand_kp"] = batch["right_hand_kp"].to(device)
+            input_lengths = batch["n_frames"]
 
-        if args.model == "Conv":
-            prediction = model(batch["body_kp"])
-        elif args.model == "TransformerEncoder":
-            prediction = model(batch["body_kp"], input_lengths)
+            if args.model == "Conv":
+                prediction = model(batch["body_kp"])
+            elif args.model == "TransformerEncoder":
+                prediction = model(batch["body_kp"], input_lengths)
 
-        elif args.model == "ConvTransformerEncoder":
-            prediction = model(batch["body_kp"], input_lengths)
+            elif args.model == "ConvTransformerEncoder":
+                prediction = model(batch["body_kp"], input_lengths)
 
-        prediction = mask_output(prediction, input_lengths)
-        batch["right_hand_kp"] = mask_output(batch["right_hand_kp"],
-                                             input_lengths)
+            prediction = mask_output(prediction, input_lengths)
+            batch["right_hand_kp"] = mask_output(batch["right_hand_kp"],
+                                                 input_lengths)
 
-        loss = criterion(prediction, batch["right_hand_kp"])
+            loss = criterion(prediction, batch["right_hand_kp"])
 
-        pix_dist=loss_interpreter(loss)
+            pix_dist=loss_interpreter(loss)
 
-        print(prediction.shape)
 
-        for i in range(prediction.shape[0]):
+        prediction = prediction[0]
+        # Scale back to the image size.
+        # TODO: Don't hardcode upsample factor
+        prediction *= 1280
 
+        prediction = prediction.cpu().numpy()
+        utterance_id = args.utterance_folder.split("/")[-1]
+
+        for i, json_path in enumerate(batch["json_paths"][0]):
+
+            json_data = json.load(open(json_path))
+            json_data["people"][0]["hand_left_keypoints_2d"] = array2open_pose(prediction[i])
+
+            json_id = json_path.split("/")[-1]
+
+            with open(args.output_folder + "/" + json_id, "w") as f:
+                json.dump(json_data, f)
 

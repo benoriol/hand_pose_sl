@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from models import ConvModel, TransformerEncoder, ConvTransformerEncoder
 from steps import train, infer_utterance
-from steps import NormalizeFixedFactor, add_transformer_args
+from steps import NormalizeFixedFactor, add_transformer_args, collate_function
 import os
 import pickle
 
@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser()
 
 
 parser.add_argument("--utterance-folder", type=str)
+parser.add_argument("--output-folder", type=str)
 parser.add_argument("--max-frames", type=int, default=100)
 parser.add_argument("--model", type=str, choices=["Conv", "TransformerEncoder", "ConvTransformerEncoder"],
                     default="Conv")
@@ -24,12 +25,18 @@ parser.add_argument("--model-checkpoint", type=str)
 parser.add_argument("--conv-channels", type=int, default=30)
 parser.add_argument("--no-normalize", dest="normalize", action='store_false', default=True)
 
-
 add_transformer_args(parser)
 
 
 def main():
     args = parser.parse_args()
+
+    if os.path.isdir(args.output_folder):
+        raise Exception("Experiment name " + args.output_folder + " already exists.")
+    os.mkdir(args.output_folder)
+
+    with open(args.output_folder + "/args.pckl", "wb") as f:
+        pickle.dump(args, f)
 
     transform = None
     if args.normalize:
@@ -39,7 +46,7 @@ def main():
 
     dataset = PoseDataset(metadata_structure, args.max_frames, transform)
 
-    loader = DataLoader(dataset, batch_size=1)
+    loader = DataLoader(dataset, batch_size=1, collate_fn=collate_function)
 
     if args.model == "Conv":
         model = ConvModel(args.conv_channels)
@@ -50,7 +57,7 @@ def main():
 
     model.load_state_dict(torch.load(args.model_checkpoint))
 
-    json_data = infer_utterance(model, loader, args)
+    infer_utterance(model, loader, args)
 
 def build_dataset_structure(utterance_folder):
     utterance_name = utterance_folder.split("/")[-1]

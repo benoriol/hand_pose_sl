@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from models import ConvModel, TransformerEncoder, ConvTransformerEncoder
 from steps import train
-from steps import NormalizeFixedFactor, add_transformer_args
+from steps import NormalizeFixedFactor, add_transformer_args, collate_function
 import os
 import pickle
 
@@ -44,11 +44,11 @@ if __name__ == '__main__':
     if args.normalize:
         transform = NormalizeFixedFactor(1280)
 
-    train_dataset = TextPoseDataset(args.train_data, args.max_frames, transform)
-    valid_dataset = TextPoseDataset(args.valid_data, args.max_frames, transform)
+    train_dataset = PoseDataset(args.train_data, args.max_frames, transform)
+    valid_dataset = PoseDataset(args.valid_data, args.max_frames, transform)
 
-    train_dataloader =DataLoader(train_dataset, batch_size=args.batch_size)
-    valid_dataloader =DataLoader(valid_dataset, batch_size=args.batch_size)
+    train_dataloader =DataLoader(train_dataset, batch_size=args.batch_size, collate_fn=collate_function)
+    valid_dataloader =DataLoader(valid_dataset, batch_size=args.batch_size, collate_fn=collate_function)
 
     if args.model == "Conv":
         model = ConvModel(args.conv_channels)
