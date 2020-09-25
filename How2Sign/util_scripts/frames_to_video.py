@@ -22,7 +22,7 @@ def create_video(frames_folder, output_video, fps):
 
 if __name__ == '__main__':
 
-    frames_folder = "utterance_level/train/rgb_front/features/hand_pose_frames/fxIoWLKHOuo_4-3-rgb_front"
-    output_video = "utterance_level/train/rgb_front/features/hand_pose_video/fxIoWLKHOuo_4-3-rgb_front.mp4"
+    frames_folder = "utterance_level/train/rgb_front/features/dope_output/frames/fxIoWLKHOuo_4-3-rgb_front/"
+    output_video = "utterance_level/train/rgb_front/features/dope_output/videos/fxIoWLKHOuo_4-3-rgb_front.mp4"
 
     create_video(frames_folder, output_video, 24)

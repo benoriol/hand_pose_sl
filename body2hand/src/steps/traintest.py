@@ -13,7 +13,6 @@ def train(model, train_loader, val_loader, args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device:", device)
-    model.to(device)
 
     progress_saver = ProgressSaver(args.exp)
     start_time = time.time()
@@ -22,19 +21,47 @@ def train(model, train_loader, val_loader, args):
 
     best_epoch, best_val_loss = 0, np.inf
     lr = args.lr
-
-    criterion = nn.MSELoss()
+    if args.loss == "MSE":
+        criterion = nn.MSELoss()
+    elif args.loss == "L1":
+        criterion = nn.L1Loss()
+    elif args.loss == "huber":
+        criterion = nn.SmoothL1Loss()
+    else:
+        raise ValueError()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    #optimizer = torch.optim.Adam(model.parameters())
 
     train_loss_meter = AverageMeter()
 
     n_iter = 0
+    init_epoch = 0
+
+    if args.resume:
+        progress_saver.load_progress()
+        init_epoch, best_val_loss, start_time = progress_saver.get_resume_stats()
+
+        start_time = time.time() - start_time
+
+        model.load_state_dict(torch.load(args.exp + "/models/last_model.pth"))
 
 
-    for n in range(args.num_epochs):
+        optimizer.load_state_dict(
+            torch.load(args.exp + "/models/last_optim.pth"))
+        for state in optimizer.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.to(device)
+        print("loaded state dict from epoch %d" % init_epoch)
 
+        init_epoch += 1
+
+    model.to(device)
+
+
+
+    for n in range(init_epoch, args.num_epochs):
+        model.train()
         train_loss_meter.reset()
 
         if args.lr_decay > 0:
@@ -51,12 +78,14 @@ def train(model, train_loader, val_loader, args):
             if args.model == "Conv":
                 prediction = model(batch["body_kp"])
 
-
             elif args.model == "TransformerEncoder":
                 prediction = model(batch["body_kp"], input_lengths)
 
             elif args.model == "ConvTransformerEncoder":
                 prediction = model(batch["body_kp"], input_lengths)
+
+            elif args.model == "TransformerEnc":
+                prediction = model(batch["body_kp"])
 
             else:
                 raise ValueError()
@@ -75,6 +104,9 @@ def train(model, train_loader, val_loader, args):
                 print("iteration: " + str(n_iter))
                 # os.system("nvidia-smi")
             n_iter += 1
+
+            # if n == 17:
+            #     quit()
 
 
         validation_loss = validate(model, val_loader, criterion, device, args)
@@ -109,9 +141,8 @@ def train(model, train_loader, val_loader, args):
                     validation_loss, valid_pix_dist, total_time)
 
 
-
-
 def validate(model, val_loader, criterion, device, args):
+    model.eval()
 
     with torch.no_grad():
 
@@ -131,6 +162,9 @@ def validate(model, val_loader, criterion, device, args):
             elif args.model == "ConvTransformerEncoder":
                 prediction = model(batch["body_kp"], input_lengths)
 
+            elif args.model == "TransformerEnc":
+                prediction = model(batch["body_kp"])
+
             prediction = mask_output(prediction, input_lengths)
             batch["right_hand_kp"] = mask_output(batch["right_hand_kp"],
                                                  input_lengths)
@@ -138,9 +172,7 @@ def validate(model, val_loader, criterion, device, args):
             loss = criterion(prediction, batch["right_hand_kp"])
             loss_average.update(loss.item())
 
-
         return loss_average.get_average()
-
 
 
 def infer_utterance(model, loader, args):
@@ -156,14 +188,14 @@ def infer_utterance(model, loader, args):
             batch["body_kp"] = batch["body_kp"].to(device)
             batch["right_hand_kp"] = batch["right_hand_kp"].to(device)
             input_lengths = batch["n_frames"]
-
             if args.model == "Conv":
                 prediction = model(batch["body_kp"])
             elif args.model == "TransformerEncoder":
                 prediction = model(batch["body_kp"], input_lengths)
-
             elif args.model == "ConvTransformerEncoder":
                 prediction = model(batch["body_kp"], input_lengths)
+            elif args.model == "TransformerEnc":
+                prediction = model(batch["body_kp"])
 
             prediction = mask_output(prediction, input_lengths)
             batch["right_hand_kp"] = mask_output(batch["right_hand_kp"],
@@ -173,11 +205,11 @@ def infer_utterance(model, loader, args):
 
             pix_dist=loss_interpreter(loss)
 
-
         prediction = prediction[0]
         # Scale back to the image size.
         # TODO: Don't hardcode upsample factor
-        prediction *= 1280
+        if args.normalize:
+            prediction *= 1280
 
         prediction = prediction.cpu().numpy()
         utterance_id = args.utterance_folder.split("/")[-1]
@@ -185,7 +217,7 @@ def infer_utterance(model, loader, args):
         for i, json_path in enumerate(batch["json_paths"][0]):
 
             json_data = json.load(open(json_path))
-            json_data["people"][0]["hand_left_keypoints_2d"] = array2open_pose(prediction[i])
+            json_data["people"][0]["hand_right_keypoints_2d"] = array2open_pose(prediction[i])
 
             json_id = json_path.split("/")[-1]
 

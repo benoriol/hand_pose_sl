@@ -55,6 +55,14 @@ class ProgressSaver():
         with open("%s/progress.pckl" % self.exp_dir, "wb") as f:
             pickle.dump(self.progress, f)
 
+    def load_progress(self):
+        with open("%s/progress.pckl" % self.exp_dir, "rb") as f:
+            self.progress = pickle.load(f)
+
+    def get_resume_stats(self):
+        return self.progress["epoch"][-1], self.progress["best_val_loss"][-1], self.progress["time"][-1]
+
+
 
 def print_epoch(epoch, train_loss, train_pix_dist, val_loss, val_pix_dist, time):
 
@@ -181,13 +189,14 @@ class NormalizeFixedFactor:
     def denormalize_tensor(self, tensor):
         return tensor * self.factor
 
+# TODO Fix pixel distance formula
 class MSE2Pixels:
     def __init__(self, num_joints, upsample):
         self.num_joints = num_joints
         self.upsample = upsample
 
-    def __call__(self, mse, len):
-        pix = mse / self.num_joints / len
+    def __call__(self, mse):
+        pix = mse / self.num_joints
         pix = pix ** (1/2)
         pix = pix * self.upsample
         return pix
@@ -202,7 +211,6 @@ def adjust_learning_rate(base_lr, lr_decay, optimizer, epoch):
 
 def mask_output(output, lengths):
     for i, len in enumerate(lengths):
-
         output[i, len:, :] = 0
     return output
 
