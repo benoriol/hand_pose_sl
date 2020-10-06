@@ -392,7 +392,7 @@ class TransformerEnc(nn.Module):
         self.model_type = 'Transformer'
         self.src_mask = None
         self.pos_encoder = PositionalEncoding(ninp, dropout, max_len=100)
-        encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid,
+        encoder_layers = TransformerEncoderLayer(nhid, nhead, nhid,
                                                  dropout)
 
         #self.linear_pos_enc = LinearPositionalEmbedding(max_len=100)
@@ -400,9 +400,11 @@ class TransformerEnc(nn.Module):
                                                       nlayers)
         # self.encoder = nn.Embedding(ntoken, ninp)
         self.ninp = ninp
-        self.decoder = nn.Linear(ninp, nout)
 
-        self.init_weights()
+        self.hidden2pose_projection = nn.Linear(nhid, nout)
+        self.pose2hidden_projection = nn.Linear(ninp, nhid)
+
+        #self.init_weights()
 
     def _generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
@@ -434,10 +436,63 @@ class TransformerEnc(nn.Module):
         src = src.permute(1, 0, 2)
         src = self.pos_encoder(src)
 
+        src = self.pose2hidden_projection(src)
         output = self.transformer_encoder(src)
-        output = self.decoder(output)
+        output = self.hidden2pose_projection(output)
         output = output.permute(1, 0, 2)
 
         output = output.view(bs, seq_len, -1, dim)
 
         return output
+
+
+class TextPoseTransformer(nn.Module):
+    def __init__(self, n_tokens, n_joints, joints_dim, nhead, nhid, nout, n_enc_layers, n_dec_layers, dropout=0.5):
+        super(TextPoseTransformer, self).__init__()
+        from torch.nn import Transformer
+        self.model_type = 'Transformer'
+        self.src_mask = None
+        self.token_pos_encoder = PositionalEncoding(nhid, dropout,
+                                              max_len=40)
+        self.pose_pos_encoder = PositionalEncoding(nhid, dropout,
+                                              max_len=100)
+
+        self.transformer = Transformer(nhid, nhead, n_enc_layers, n_dec_layers, nhid, dropout=dropout)
+
+        self.token_embedding = nn.Embedding(n_tokens, nhid)
+        self.hidden2pose_projection = nn.Linear(nhid, nout)
+        self.pose2hidden_projection = nn.Linear(n_joints*joints_dim, nhid)
+
+        self.init_weights()
+
+
+    def forward(self, input_tokens, input_pose):
+        bs, seq_len, n_in_joints, dim = input_pose.shape
+        input_pose = input_pose.view(bs, seq_len, -1)
+        input_pose = input_pose.permute(1, 0, 2)
+
+        input_tokens_embedding = self.token_embedding(input_tokens)
+        input_tokens_embedding = input_tokens_embedding.permute(1, 0, 2)
+        #input_pose = input_pose.reshape(bs * seq_len, -1)
+        input_pose = self.pose2hidden_projection(input_pose)
+
+        predictions = self.transformer(input_tokens_embedding, input_pose)
+
+        predictions = self.hidden2pose_projection(predictions)
+
+        predictions = predictions.permute(1, 0, 2)
+        predictions = predictions.view(bs, seq_len, -1, dim)
+
+
+
+
+
+        return predictions
+
+
+    def init_weights(self):
+        initrange = 0.1
+        # self.encoder.weight.data.uniform_(-initrange, initrange)
+        # self.transformer.bias.data.zero_()
+        # self.transformer.weight.data.uniform_(-initrange, initrange)
+        pass
