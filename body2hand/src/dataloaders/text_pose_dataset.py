@@ -396,3 +396,132 @@ class FastPoseDataset(Dataset):
 
         return item
 
+class FastTextPoseDataset(Dataset):
+    def __init__(self, metadata_file, max_frames, transform, use_rand_tokens=False):
+        super().__init__()
+        if isinstance(metadata_file, str):
+            self.data = json.load(open(metadata_file))
+        elif isinstance(metadata_file, list):
+            self.data = metadata_file
+        self.max_frames = max_frames
+
+        self.transform = transform
+
+        self.tokenizer = Tokenizer.from_file("tokenizer_models/tokenizer.json")
+
+        self.n_tokens = 0
+        self.n_utt = 0
+
+        self.random_tokens = torch.randint(0, 999, (40,), dtype=torch.long)
+
+        self.use_rand_tokens = use_rand_tokens
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+
+        #print("Start get item")
+
+        # DONE: Get right and left hand
+        # TODO: Random crop of sequence instead of clipping to first N
+
+        metadata = self.data[idx]
+
+        json_data = metadata["frame_jsons"]
+
+        json_data, start_frame = select_jsons(json_data, self.max_frames)
+
+        item = self.load_jsons(json_data)
+
+
+        item["text"] = metadata["text"]
+        item["n_frames"] = min(metadata["n_frames"], self.max_frames)
+
+        #
+        # self.n_tokens += len(tokens)
+        # self.n_utt += 1
+
+        # Pad sequence to max len
+        item = self.pad(item)
+
+        # Clip sequence to max len
+        # TODO This should not be needed since it is clipped in the all_jsons list
+        item = self.clip(item)
+
+        # To tensor
+        item = self.to_tensor(item)
+
+        if self.transform:
+            item = self.transform(item)
+
+
+        if self.use_rand_tokens:
+            item["text_tokens"] = self.random_tokens
+
+        else:
+            tokens = self.tokenizer.encode(item["text"]).ids
+            tokens = tokens[:40]
+            tokens = tokens + [0] * (40 - len(tokens))
+            tokens = torch.tensor(tokens, dtype=torch.long)
+            item["text_tokens"] = tokens
+
+        return item
+
+    def load_jsons(self, all_jsons):
+        item = {
+            "body_kp": [],
+            "body_conf": [],
+            "right_hand_kp": [],
+            "right_hand_conf": [],
+            "left_hand_kp": [],
+            "left_hand_conf": [],
+            "json_paths": [],
+        }
+
+        for json_file in all_jsons:
+            r_hand_kp, r_hand_conf, l_hand_kp, l_hand_conf, body_kp, body_conf = load_keypoints(
+                json_file)
+            item["body_kp"].append(body_kp)
+            item["right_hand_kp"].append(r_hand_kp)
+            item["left_hand_kp"].append(l_hand_kp)
+            item["body_conf"].append(body_conf)
+            item["right_hand_conf"].append(r_hand_conf)
+            item["left_hand_conf"].append(l_hand_conf)
+            item["json_paths"].append(json_file)
+        return item
+
+    def pad(self, item):
+        while len(item["body_kp"]) < self.max_frames:
+            item["body_kp"].append(item["body_kp"][0])
+            item["right_hand_kp"].append(item["right_hand_kp"][0])
+            item["left_hand_kp"].append(item["left_hand_kp"][0])
+            item["body_conf"].append(item["body_conf"][0])
+            item["right_hand_conf"].append(item["right_hand_conf"][0])
+            item["left_hand_conf"].append(item["left_hand_conf"][0])
+        return item
+
+    def clip(self, item):
+        item["body_kp"] = item["body_kp"][:self.max_frames]
+        item["right_hand_kp"] = item["right_hand_kp"][:self.max_frames]
+        item["left_hand_kp"] = item["left_hand_kp"][:self.max_frames]
+        item["body_conf"] = item["body_conf"][:self.max_frames]
+        item["right_hand_conf"] = item["right_hand_conf"][:self.max_frames]
+        item["left_hand_conf"] = item["left_hand_conf"][:self.max_frames]
+        item["json_paths"] = item["json_paths"][:self.max_frames]
+
+        return item
+
+    def select_frames(self, all_jsons):
+        all_jsons = all_jsons[:self.max_frames]
+        return all_jsons
+
+    def to_tensor(self, item):
+        item["body_kp"] = torch.tensor(item["body_kp"]).float()
+        item["right_hand_kp"] = torch.tensor(item["right_hand_kp"]).float()
+        item["left_hand_kp"] = torch.tensor(item["left_hand_kp"]).float()
+        item["body_conf"] = torch.tensor(item["body_conf"]).float()
+        item["right_hand_conf"] = torch.tensor(item["right_hand_conf"]).float()
+        item["left_hand_conf"] = torch.tensor(item["left_hand_conf"]).float()
+
+        return item

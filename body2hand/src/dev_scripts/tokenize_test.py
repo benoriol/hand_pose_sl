@@ -4,10 +4,10 @@ from tokenizers import Tokenizer, models, pre_tokenizers, decoders, trainers, pr
 
 from tokenizers import CharBPETokenizer
 
-from dataloaders import PoseDataset, TextPoseDataset
-from torch.utils.data import DataLoader
-
-from steps import NormalizeFixedFactor, add_transformer_args, collate_function
+# from dataloaders import PoseDataset, TextPoseDataset
+# from torch.utils.data import DataLoader
+#
+# from steps import NormalizeFixedFactor, add_transformer_args, collate_function
 
 
 parser = argparse.ArgumentParser()
@@ -32,25 +32,25 @@ def infer():
 
     encoded = tokenizer.encode("I can feel the magic, can you?")
 
-    print(encoded.tokens)
+    print(encoded.ids)
 
 if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # train(args)
+    train(args)
+
+    infer()
+    # print("hola")
+    # train_dataset = TextPoseDataset("../How2Sign/metadata/metadata.train.json", 100, None)
+    # print("ke")
     #
-    # infer()
-    print("hola")
-    train_dataset = TextPoseDataset("../How2Sign/metadata/metadata.train.json", 100, None)
-    print("ke")
-
-    train_dataloader = DataLoader(train_dataset, batch_size=100,
-                                  collate_fn=collate_function)
-    print("hola")
-
-    for i, x in enumerate(train_dataloader):
-        print(i)
-    print(train_dataset.n_tokens)
-    print(train_dataset.n_utt)
+    # train_dataloader = DataLoader(train_dataset, batch_size=100,
+    #                               collate_fn=collate_function)
+    # print("hola")
+    #
+    # for i, x in enumerate(train_dataloader):
+    #     print(i)
+    # print(train_dataset.n_tokens)
+    # print(train_dataset.n_utt)
 

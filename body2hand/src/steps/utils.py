@@ -5,6 +5,8 @@ import numpy as np
 
 from torch.utils.data.dataloader import default_collate
 
+import torch.nn as nn
+
 
 class AverageMeter():
     def __init__(self):
@@ -189,6 +191,15 @@ class NormalizeFixedFactor:
     def denormalize_tensor(self, tensor):
         return tensor * self.factor
 
+class WristDifference:
+    def __init__(self):
+        # According to  https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/output.md#pose-output-format-body_25
+        # and taking into consideration we are not using all the body points. See text_pose_dataset.py
+        self.right_wrist_index = 4
+    def __call__(self, item):
+        item["right_hand_kp"] = item["right_hand_kp"] - item["right_hand_kp"][:, self.right_wrist_index].unsqueeze(1)
+        return item
+
 # TODO Fix pixel distance formula
 class MSE2Pixels:
     def __init__(self, num_joints, upsample):
@@ -200,6 +211,17 @@ class MSE2Pixels:
         pix = pix ** (1/2)
         pix = pix * self.upsample
         return pix
+
+class L12Pixels:
+    def __init__(self, num_joints, upsample):
+        self.num_joints = num_joints
+        self.upsample = upsample
+
+    def __call__(self, mse):
+        pix = mse / self.num_joints
+        pix = pix * self.upsample
+        return pix
+
 
 def adjust_learning_rate(base_lr, lr_decay, optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every lr_decay epochs"""
@@ -267,3 +289,21 @@ def collate_function(batch):
     batch["text"] = texts
 
     return batch
+
+class maskedPoseL1(nn.Module):
+    def __init__(self):
+        super(maskedPoseL1, self).__init__()
+        # This reduction will average the loss across the seq_lenght dimension
+        # (1st dimension)
+        self.l1 = nn.L1Loss(reduction="mean")
+
+    def forward(self, prediction, target, lengths):
+        loss = 0
+        for i, seq_len in enumerate(lengths):
+            prediction_ = prediction[i, :seq_len]
+            target_ = target[i, :seq_len]
+
+            # Computes the average loss across the length of the sequence
+            loss += self.l1(prediction_, target_)
+
+        return loss / i
