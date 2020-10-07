@@ -17,7 +17,7 @@ parser.add_argument("--exp", type=str, default="../exp/default_exp")
 parser.add_argument("--train-data", type=str, default="../../How2Sign/metadata/pose_metadata_short.json")
 parser.add_argument("--valid-data", type=str, default="../../How2Sign/metadata/pose_metadata_short.json")
 
-parser.add_argument("--max-frames", type=int, default=100)
+parser.add_argument("--max-frames", type=int, default=200)
 parser.add_argument("--model", type=str, choices=["Conv", "TransformerEncoder",
                                                   "ConvTransformerEncoder",
                                                   "TransformerEnc",

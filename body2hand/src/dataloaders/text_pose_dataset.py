@@ -350,7 +350,7 @@ class FastPoseDataset(Dataset):
         }
 
         for json_file in all_jsons:
-            r_hand_kp, r_hand_conf, l_hand_kp, l_hand_conf, body_kp, body_conf = load_keypoints(
+            r_hand_kp, r_hand_conf, l_hand_kp, l_hand_conf, body_kp, body_conf, json_path = load_keypoints(
                 json_file)
             item["body_kp"].append(body_kp)
             item["right_hand_kp"].append(r_hand_kp)
@@ -481,14 +481,18 @@ class FastTextPoseDataset(Dataset):
 
         for json_file in all_jsons:
             r_hand_kp, r_hand_conf, l_hand_kp, l_hand_conf, body_kp, body_conf = load_keypoints(
-                json_file)
+                json_file["json_data"])
             item["body_kp"].append(body_kp)
             item["right_hand_kp"].append(r_hand_kp)
             item["left_hand_kp"].append(l_hand_kp)
             item["body_conf"].append(body_conf)
             item["right_hand_conf"].append(r_hand_conf)
             item["left_hand_conf"].append(l_hand_conf)
-            item["json_paths"].append(json_file)
+            if isinstance(json_file, str):
+                item["json_paths"].append(json_file)
+            else:
+                # TODO Modify the big json generation script to the path of json
+                item["json_paths"].append(json_file["json_path"])
         return item
 
     def pad(self, item):

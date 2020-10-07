@@ -190,12 +190,12 @@ def validate(model, val_loader, criterion, device, args):
 
 
 def infer_utterance(model, loader, args):
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     criterion = nn.MSELoss()
     loss_interpreter = MSE2Pixels(21, 1280)
 
+    model.eval()
     with torch.no_grad():
 
         for batch in loader:
@@ -211,6 +211,13 @@ def infer_utterance(model, loader, args):
             elif args.model == "TransformerEnc":
                 prediction = model(batch["body_kp"])
 
+            elif args.model == "TextPoseTransformer":
+                batch["text_tokens"] = batch["text_tokens"].to(device)
+                prediction = model(batch["text_tokens"], batch["body_kp"])
+
+            else:
+                raise ValueError()
+
             prediction = mask_output(prediction, input_lengths)
             batch["right_hand_kp"] = mask_output(batch["right_hand_kp"],
                                                  input_lengths)
@@ -218,6 +225,9 @@ def infer_utterance(model, loader, args):
             loss = criterion(prediction, batch["right_hand_kp"])
 
             pix_dist=loss_interpreter(loss)
+            print("Loss:", loss.item, "\tPix distance:", pix_dist)
+
+        utt_id = args.data.replace(".json", "")
 
         prediction = prediction[0]
         # Scale back to the image size.
@@ -226,17 +236,13 @@ def infer_utterance(model, loader, args):
             prediction *= 1280
 
         prediction = prediction.cpu().numpy()
-        utterance_id = args.utterance_folder.split("/")[-1]
-
-        prediction = prediction +
-
         for i, json_path in enumerate(batch["json_paths"][0]):
-
+            # For now, if is loaded directly from the big json, we don't have access to the
+            # specific json file, so just make up one.
+            print(json_path)
             # add wrist position in case it has been train differentially to
             # this keypoint
-
-
-
+            json_path = json_path
             json_data = json.load(open(json_path))
             json_data["people"][0]["hand_right_keypoints_2d"] = array2open_pose(prediction[i])
 

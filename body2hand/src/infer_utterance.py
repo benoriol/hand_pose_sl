@@ -1,11 +1,11 @@
 
 import argparse
-from dataloaders import PoseDataset, TextPoseDataset
+from dataloaders import FastPoseDataset, FastTextPoseDataset
 
 import torch
 from torch.utils.data import DataLoader
 
-from models import ConvModel, TransformerEncoder, ConvTransformerEncoder, TransformerEnc
+from models import ConvModel, TransformerEncoder, ConvTransformerEncoder, TransformerEnc, TextPoseTransformer
 from steps import train, infer_utterance
 from steps import NormalizeFixedFactor, add_transformer_args, collate_function
 import os
@@ -17,19 +17,25 @@ parser = argparse.ArgumentParser()
 
 
 parser.add_argument("--utterance-folder", type=str)
+parser.add_argument("--data", type=str)
 parser.add_argument("--output-folder", type=str)
-parser.add_argument("--max-frames", type=int, default=100)
+parser.add_argument("--max-frames", type=int, default=200)
 parser.add_argument("--model", type=str, choices=["Conv", "TransformerEncoder",
                                                   "ConvTransformerEncoder",
-                                                  "TransformerEnc"],
-                    default="TransformerEnc")
+                                                  "TransformerEnc",
+                                                  "TextPoseTransformer"],
+                    default="TextPoseTransformer")
 parser.add_argument("--model-checkpoint", type=str)
 parser.add_argument("--conv-channels", type=int, default=30)
 parser.add_argument("--conv-pos-emb", action='store_true', default=False)
 
 parser.add_argument("--no-normalize", dest="normalize", action='store_false', default=True)
 
-add_transformer_args(parser)
+parser.add_argument("--rand-tokens", dest="rand_tokens", action='store_true', default=False)
+parser.add_argument("--transformer-dropout", default=0.1, type=float)
+
+
+#add_transformer_args(parser)
 
 
 def main():
@@ -45,10 +51,13 @@ def main():
     transform = None
     if args.normalize:
         transform = NormalizeFixedFactor(1280)
-    utterance_dict = build_dataset_structure(args.utterance_folder)
-    metadata_structure = [utterance_dict]
+    # utterance_dict = build_dataset_structure(args.utterance_folder)
+    # metadata_structure = [utterance_dict]
 
-    dataset = PoseDataset(metadata_structure, args.max_frames, transform)
+    if "Text" in args.model:
+        dataset = FastTextPoseDataset(args.data, args.max_frames, transform, use_rand_tokens=args.rand_tokens)
+    else:
+        dataset = FastPoseDataset(args.data, args.max_frames, transform)
 
     loader = DataLoader(dataset, batch_size=1, collate_fn=collate_function)
 
@@ -61,7 +70,12 @@ def main():
     elif args.model == "TransformerEnc":
         model = TransformerEnc(ninp=12*2, nhead=4, nhid=100, nout=21*2,
                                nlayers=4, dropout=0.0)
-
+    elif args.model == "TextPoseTransformer":
+        model = TextPoseTransformer(n_tokens=1000, n_joints=12, joints_dim=2, nhead=4,
+                                    nhid=128, nout=21*2, n_enc_layers=4, n_dec_layers=4,
+                                    dropout=args.transformer_dropout)
+    else:
+        raise ValueError()
     model.load_state_dict(torch.load(args.model_checkpoint))
 
     infer_utterance(model, loader, args)
