@@ -64,11 +64,15 @@ if __name__ == '__main__':
             continue
         utterance_dict["n_frames"] = len(frame_jsons)
         #utterance_dict["frame_jsons"] = frame_jsons
-        utterance_dict["frame_jsons"] = [json.load(open(x)) for x in frame_jsons]
+        utterance_dict["frame_jsons"] = []
+        for x in frame_jsons:
+            utterance_dict["frame_jsons"].append({
+                "json_path": x,
+                "json_data": json.load(open(x))
+            })
 
         output_data.append(utterance_dict)
 
-    f = open("hola", "w")
 
     with open(args.out_file, "w") as fp:
         json.dump(output_data, fp)

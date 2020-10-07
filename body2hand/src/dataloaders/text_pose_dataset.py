@@ -397,7 +397,8 @@ class FastPoseDataset(Dataset):
         return item
 
 class FastTextPoseDataset(Dataset):
-    def __init__(self, metadata_file, max_frames, transform, use_rand_tokens=False):
+    def __init__(self, metadata_file, max_frames, transform, selection,
+                 use_rand_tokens=False):
         super().__init__()
         if isinstance(metadata_file, str):
             self.data = json.load(open(metadata_file))
@@ -416,6 +417,8 @@ class FastTextPoseDataset(Dataset):
 
         self.use_rand_tokens = use_rand_tokens
 
+        self.selection = selection
+
     def __len__(self):
         return len(self.data)
 
@@ -430,7 +433,7 @@ class FastTextPoseDataset(Dataset):
 
         json_data = metadata["frame_jsons"]
 
-        json_data, start_frame = select_jsons(json_data, self.max_frames)
+        json_data, start_frame = select_jsons(json_data, self.max_frames, selection)
 
         item = self.load_jsons(json_data)
 
@@ -480,8 +483,12 @@ class FastTextPoseDataset(Dataset):
         }
 
         for json_file in all_jsons:
-            r_hand_kp, r_hand_conf, l_hand_kp, l_hand_conf, body_kp, body_conf = load_keypoints(
-                json_file["json_data"])
+            if "json_data" in json_file.keys():
+                r_hand_kp, r_hand_conf, l_hand_kp, l_hand_conf, body_kp, body_conf = load_keypoints(
+                    json_file["json_data"])
+            else:
+                r_hand_kp, r_hand_conf, l_hand_kp, l_hand_conf, body_kp, body_conf = load_keypoints(
+                    json_file)
             item["body_kp"].append(body_kp)
             item["right_hand_kp"].append(r_hand_kp)
             item["left_hand_kp"].append(l_hand_kp)

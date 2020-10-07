@@ -239,7 +239,6 @@ def infer_utterance(model, loader, args):
         for i, json_path in enumerate(batch["json_paths"][0]):
             # For now, if is loaded directly from the big json, we don't have access to the
             # specific json file, so just make up one.
-            print(json_path)
             # add wrist position in case it has been train differentially to
             # this keypoint
             json_path = json_path
