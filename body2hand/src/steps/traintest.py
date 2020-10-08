@@ -98,6 +98,7 @@ def train(model, train_loader, val_loader, args):
             #batch["right_hand_kp"] = mask_output(batch["right_hand_kp"], input_lengths)
 
             loss = criterion(prediction, batch["right_hand_kp"], input_lengths)
+            #loss = criterion(prediction, batch["right_hand_kp"])
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -184,6 +185,7 @@ def validate(model, val_loader, criterion, device, args):
             #                                      input_lengths)
 
             loss = criterion(prediction, batch["right_hand_kp"], input_lengths)
+            #loss = criterion(prediction, batch["right_hand_kp"])
             loss_average.update(loss.item())
 
         return loss_average.get_average()

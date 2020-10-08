@@ -18,6 +18,9 @@ parser.add_argument("--train-data", type=str, default="../../How2Sign/metadata/p
 parser.add_argument("--valid-data", type=str, default="../../How2Sign/metadata/pose_metadata_short.json")
 
 parser.add_argument("--max-frames", type=int, default=200)
+parser.add_argument("--frames-selection", type=str, choices=["first",
+                                                             "randomcrop"],
+                    default="first")
 parser.add_argument("--model", type=str, choices=["Conv", "TransformerEncoder",
                                                   "ConvTransformerEncoder",
                                                   "TransformerEnc",
@@ -31,7 +34,7 @@ parser.add_argument("--wrist-dif", dest="wrist_dif", action='store_true', defaul
 
 parser.add_argument("--num-epochs", type=int, default=99999999)
 parser.add_argument("-b", "--batch-size", type=int, default=128)
-parser.add_argument("--lr", type=float, default=0.001)
+parser.add_argument("--lr", type=float, default=0.0002)
 parser.add_argument("--lr-decay", type=int, default=-1)
 
 parser.add_argument("--loss", type=str, default="L1", choices=["MSE", "L1", "huber"])
@@ -75,8 +78,12 @@ if __name__ == '__main__':
 
     if "Text" in args.model:
         print("Loading text dataset")
-        train_dataset = FastTextPoseDataset(args.train_data, args.max_frames, transforms, use_rand_tokens=args.rand_tokens)
-        valid_dataset = FastTextPoseDataset(args.valid_data, args.max_frames, transforms, use_rand_tokens=args.rand_tokens)
+        train_dataset = FastTextPoseDataset(args.train_data, args.max_frames, transforms,
+                                            selection=args.frames_selection,
+                                            use_rand_tokens=args.rand_tokens)
+        valid_dataset = FastTextPoseDataset(args.valid_data, args.max_frames, transforms,
+                                            selection=args.frames_selection,
+                                            use_rand_tokens=args.rand_tokens)
     else:
         print("Loading dataset without text")
         train_dataset = FastPoseDataset(args.train_data, args.max_frames, transforms)

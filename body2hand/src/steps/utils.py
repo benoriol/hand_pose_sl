@@ -305,5 +305,4 @@ class maskedPoseL1(nn.Module):
 
             # Computes the average loss across the length of the sequence
             loss += self.l1(prediction_, target_)
-
-        return loss / i
+        return loss / (i+1)

@@ -55,7 +55,8 @@ def main():
     # metadata_structure = [utterance_dict]
 
     if "Text" in args.model:
-        dataset = FastTextPoseDataset(args.data, args.max_frames, transform, use_rand_tokens=args.rand_tokens)
+        dataset = FastTextPoseDataset(args.data, args.max_frames, transform, selection="randomcrop",
+                                      use_rand_tokens=args.rand_tokens)
     else:
         dataset = FastPoseDataset(args.data, args.max_frames, transform)
 

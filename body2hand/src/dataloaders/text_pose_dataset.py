@@ -45,7 +45,7 @@ def load_keypoints(input_json):
 
     return r_hand_kp, r_hand_conf, l_hand_kp, l_hand_conf, body_kp, body_conf
 
-def select_jsons(all_jsons, n=100, selection_type="first_n"):
+def select_jsons(all_jsons, n=100, selection_type=None):
     '''
     :param all_jsons: list with al json files
     :param n: number to be selected
@@ -56,12 +56,12 @@ def select_jsons(all_jsons, n=100, selection_type="first_n"):
     if len(all_jsons) <= n:
         return all_jsons, 0
 
-    elif selection_type == "first_n":
+    elif selection_type == "first":
         return all_jsons[:n], 0
 
-    elif selection_type == "random_crop":
-        raise NotImplementedError()
+    elif selection_type == "randomcrop":
         start_n = random.randint(0, len(all_jsons) - n)
+        return all_jsons[start_n:start_n+n], start_n
 
 
 class PoseDataset(Dataset):
@@ -433,7 +433,7 @@ class FastTextPoseDataset(Dataset):
 
         json_data = metadata["frame_jsons"]
 
-        json_data, start_frame = select_jsons(json_data, self.max_frames, selection)
+        json_data, start_frame = select_jsons(json_data, self.max_frames, selection_type=self.selection)
 
         item = self.load_jsons(json_data)
 
@@ -497,9 +497,11 @@ class FastTextPoseDataset(Dataset):
             item["left_hand_conf"].append(l_hand_conf)
             if isinstance(json_file, str):
                 item["json_paths"].append(json_file)
-            else:
-                # TODO Modify the big json generation script to the path of json
+            # TODO ADAPT this to new json format
+            elif "json_path" in json_file.keys():
                 item["json_paths"].append(json_file["json_path"])
+            else:
+                item["json_paths"].append(None)
         return item
 
     def pad(self, item):
