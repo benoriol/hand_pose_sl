@@ -64,6 +64,7 @@ def select_jsons(all_jsons, n=100, selection_type=None):
         return all_jsons[start_n:start_n+n], start_n
 
 
+
 class PoseDataset(Dataset):
     def __init__(self, metadata_file, max_frames, transform):
         super().__init__()
@@ -455,10 +456,6 @@ class FastTextPoseDataset(Dataset):
         # To tensor
         item = self.to_tensor(item)
 
-        if self.transform:
-            item = self.transform(item)
-
-
         if self.use_rand_tokens:
             item["text_tokens"] = self.random_tokens
 
@@ -468,6 +465,9 @@ class FastTextPoseDataset(Dataset):
             tokens = tokens + [0] * (40 - len(tokens))
             tokens = torch.tensor(tokens, dtype=torch.long)
             item["text_tokens"] = tokens
+
+        if self.transform:
+            item = self.transform(item)
 
         return item
 

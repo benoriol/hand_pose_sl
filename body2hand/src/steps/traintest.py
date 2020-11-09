@@ -7,7 +7,8 @@ import time
 import json
 
 from .utils import AverageMeter, ProgressSaver, print_epoch, MSE2Pixels, adjust_learning_rate, \
-    mask_output, array2open_pose, L12Pixels, maskedPoseL1
+    mask_output, array2open_pose, array2open_pose_index, array2open_pose_3finger, \
+    L12Pixels, maskedPoseL1, poderatedPoseL1
 
 def train(model, train_loader, val_loader, args):
 
@@ -16,7 +17,18 @@ def train(model, train_loader, val_loader, args):
 
     progress_saver = ProgressSaver(args.exp)
 
-    loss_interpreter = L12Pixels(21, 1280)
+    if args.predict == "right_index":
+        loss_interpreter = L12Pixels(4, 1280)
+
+    elif args.predict == "right_3fingers":
+        loss_interpreter = L12Pixels(12, 1280)
+
+    elif args.predict == "right_hand":
+        loss_interpreter = L12Pixels(21, 1280)
+
+    else:
+        print(args.predict)
+        raise ValueError
 
     best_epoch, best_val_loss = 0, np.inf
     lr = args.lr
@@ -25,6 +37,8 @@ def train(model, train_loader, val_loader, args):
     elif args.loss == "L1":
         #criterion = nn.L1Loss()
         criterion = maskedPoseL1()
+    elif args.loss == "confL1":
+        criterion = poderatedPoseL1()
     elif args.loss == "huber":
         criterion = nn.SmoothL1Loss()
     else:
@@ -71,8 +85,8 @@ def train(model, train_loader, val_loader, args):
         t = time.time()
         for batch in train_loader:
             #print("Start loader loop")
-            batch["body_kp"] = batch["body_kp"].to(device)
-            batch["right_hand_kp"] = batch["right_hand_kp"].to(device)
+            batch["input_kp"] = batch["input_kp"].to(device)
+            batch["target_kp"] = batch["target_kp"].to(device)
             input_lengths = batch["n_frames"]
             t = time.time()
             if args.model == "Conv":
@@ -88,16 +102,18 @@ def train(model, train_loader, val_loader, args):
                 prediction = model(batch["body_kp"])
 
             elif args.model == "TextPoseTransformer":
-
                 batch["text_tokens"] = batch["text_tokens"].to(device)
-                prediction = model(batch["text_tokens"], batch["body_kp"])
+                prediction = model(batch["text_tokens"], batch["input_kp"])
             else:
                 raise ValueError()
 
             prediction = mask_output(prediction, input_lengths)
             #batch["right_hand_kp"] = mask_output(batch["right_hand_kp"], input_lengths)
 
-            loss = criterion(prediction, batch["right_hand_kp"], input_lengths)
+            if args.loss == "L1":
+                loss = criterion(prediction, batch["target_kp"], input_lengths)
+            elif args.loss == "confL1":
+                loss = criterion(prediction, batch["target_kp"], input_lengths, batch["target_conf"])
             #loss = criterion(prediction, batch["right_hand_kp"])
             optimizer.zero_grad()
             loss.backward()
@@ -158,8 +174,8 @@ def validate(model, val_loader, criterion, device, args):
 
         for batch in val_loader:
 
-            batch["body_kp"] = batch["body_kp"].to(device)
-            batch["right_hand_kp"] = batch["right_hand_kp"].to(device)
+            batch["input_kp"] = batch["input_kp"].to(device)
+            batch["target_kp"] = batch["target_kp"].to(device)
             input_lengths = batch["n_frames"]
 
             if args.model == "Conv":
@@ -175,7 +191,7 @@ def validate(model, val_loader, criterion, device, args):
 
             elif args.model == "TextPoseTransformer":
                 batch["text_tokens"] = batch["text_tokens"].to(device)
-                prediction = model(batch["text_tokens"], batch["body_kp"])
+                prediction = model(batch["text_tokens"], batch["input_kp"])
 
             else:
                 raise ValueError()
@@ -184,7 +200,10 @@ def validate(model, val_loader, criterion, device, args):
             # batch["right_hand_kp"] = mask_output(batch["right_hand_kp"],
             #                                      input_lengths)
 
-            loss = criterion(prediction, batch["right_hand_kp"], input_lengths)
+            if args.loss == "L1":
+                loss = criterion(prediction, batch["target_kp"], input_lengths)
+            elif args.loss == "confL1":
+                loss = criterion(prediction, batch["target_kp"], input_lengths, batch["target_conf"])
             #loss = criterion(prediction, batch["right_hand_kp"])
             loss_average.update(loss.item())
 
@@ -194,15 +213,25 @@ def validate(model, val_loader, criterion, device, args):
 def infer_utterance(model, loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
-    criterion = nn.MSELoss()
-    loss_interpreter = MSE2Pixels(21, 1280)
+    if args.loss == "MSE":
+        criterion = nn.MSELoss()
+    elif args.loss == "L1":
+        # criterion = nn.L1Loss()
+        criterion = maskedPoseL1()
+    elif args.loss == "confL1":
+        criterion = poderatedPoseL1()
+    elif args.loss == "huber":
+        criterion = nn.SmoothL1Loss()
+    else:
+        raise ValueError()
+    # loss_interpreter = MSE2Pixels(21, 1280)
 
     model.eval()
     with torch.no_grad():
 
         for batch in loader:
-            batch["body_kp"] = batch["body_kp"].to(device)
-            batch["right_hand_kp"] = batch["right_hand_kp"].to(device)
+            batch["input_kp"] = batch["input_kp"].to(device)
+            batch["target_kp"] = batch["target_kp"].to(device)
             input_lengths = batch["n_frames"]
             if args.model == "Conv":
                 prediction = model(batch["body_kp"])
@@ -215,19 +244,22 @@ def infer_utterance(model, loader, args):
 
             elif args.model == "TextPoseTransformer":
                 batch["text_tokens"] = batch["text_tokens"].to(device)
-                prediction = model(batch["text_tokens"], batch["body_kp"])
+                prediction = model(batch["text_tokens"], batch["input_kp"])
 
             else:
                 raise ValueError()
 
-            prediction = mask_output(prediction, input_lengths)
-            batch["right_hand_kp"] = mask_output(batch["right_hand_kp"],
-                                                 input_lengths)
+            # prediction = mask_output(prediction, input_lengths)
+            # batch["right_hand_kp"] = mask_output(batch["right_hand_kp"],
+            #                                      input_lengths)
 
-            loss = criterion(prediction, batch["right_hand_kp"])
+            if args.loss == "L1":
+                loss = criterion(prediction, batch["target_kp"], input_lengths)
+            elif args.loss == "confL1":
+                loss = criterion(prediction, batch["target_kp"], input_lengths, batch["target_conf"])
 
-            pix_dist=loss_interpreter(loss)
-            print("Loss:", loss.item, "\tPix distance:", pix_dist)
+            # pix_dist=loss_interpreter(loss)
+            # print("Loss:", loss.item, "\tPix distance:", pix_dist)
 
         utt_id = args.data.replace(".json", "")
 
@@ -245,7 +277,20 @@ def infer_utterance(model, loader, args):
             # this keypoint
             json_path = json_path
             json_data = json.load(open(json_path))
-            json_data["people"][0]["hand_right_keypoints_2d"] = array2open_pose(prediction[i])
+
+            if args.predict == "right_index":
+                json_data["people"][0]["hand_right_keypoints_2d"] = \
+                    array2open_pose_index(json_data["people"][0]["hand_right_keypoints_2d"],
+                                          prediction[i])
+
+            elif args.predict == "right_3fingers":
+                json_data["people"][0]["hand_right_keypoints_2d"] = \
+                    array2open_pose_3finger(
+                        json_data["people"][0]["hand_right_keypoints_2d"],
+                        prediction[i])
+            elif args.predict == "right_hand":
+                json_data["people"][0]["hand_right_keypoints_2d"] = array2open_pose(prediction[i])
+
 
 
             json_id = json_path.split("/")[-1]
