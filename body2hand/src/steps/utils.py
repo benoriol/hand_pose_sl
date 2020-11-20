@@ -268,11 +268,11 @@ class BuildRightHandItem:
         item["input_conf"] = item["body_conf"]
         item["target_conf"] = item["right_hand_conf"]
 
-        del item["right_hand_kp"]
-        del item["body_kp"]
+        # del item["right_hand_kp"]
+        # del item["body_kp"]
 
-        del item["body_conf"]
-        del item["right_hand_conf"]
+        # del item["body_conf"]
+        # del item["right_hand_conf"]
 
         return item
 
@@ -391,6 +391,21 @@ def collate_function(batch):
 
     batch = default_collate(batch)
     batch["json_paths"] = json_paths
+    batch["text"] = texts
+
+    return batch
+
+def collate_function_h5(batch):
+
+    utt_ids = [elem["utt_id"] for elem in batch]
+    texts = [elem["text"] for elem in batch]
+
+    for elem in  batch:
+        del elem["utt_id"]
+        del elem["text"]
+
+    batch = default_collate(batch)
+    batch["utt_id"] = utt_ids
     batch["text"] = texts
 
     return batch

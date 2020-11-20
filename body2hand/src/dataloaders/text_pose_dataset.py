@@ -7,6 +7,10 @@ import time
 from tokenizers import Tokenizer
 import random
 
+import h5py
+
+import numpy
+
 BODY_HEAD_KEYPOINTS = [0, 1, 2, 3, 4, 5, 6, 7, 15, 16, 17, 18]
 
 def format_keypoints(keypoints, n_dim=2):
@@ -538,3 +542,151 @@ class FastTextPoseDataset(Dataset):
         item["left_hand_conf"] = torch.tensor(item["left_hand_conf"]).float()
 
         return item
+
+
+class TextPoseH5Dataset(Dataset):
+    def __init__(self, keypoints_file, text_file, max_frames, transform, selection,
+                 use_rand_tokens=False):
+
+        self.keypoints_data = h5py.File(keypoints_file, "r")
+
+        self.utt_texts = {}
+        text = open(text_file)
+        for line in text:
+            line = line.strip().split(" ")
+            utt_id = line[0]
+            text = line[1:]
+            text = " ".join(text)
+            self.utt_texts[utt_id] = text
+
+        text_utt_ids = set(self.utt_texts.keys())
+        keypoints_utt_ids = list(self.keypoints_data.keys())
+        self.utt_ids = list(text_utt_ids.intersection(keypoints_utt_ids))
+
+        print("IDs in text file:\t", len(text_utt_ids))
+        print("IDs in keypoints file:\t", len(keypoints_utt_ids))
+        print("IDs in both files:\t", len(self.utt_ids))
+
+        self.max_frames = max_frames
+
+        self.transform = transform
+
+        self.tokenizer = Tokenizer.from_file("tokenizer_models/tokenizer.json")
+
+        self.random_tokens = torch.randint(0, 999, (40,), dtype=torch.long)
+
+        self.use_rand_tokens = use_rand_tokens
+
+        self.selection = selection
+
+
+
+    def __len__(self):
+        return len(self.utt_ids)
+
+    def array2item(self, array):
+        N_frames = array.shape[0]
+        array = array.reshape((N_frames, 3, -1))
+        array = array.transpose(0, 2, 1)
+        array_kp = array[:, :, :2]
+        array_conf = array[:, :, 2]
+
+        body_keypoints_2d = array_kp[:, :8, :]
+        body_conf = array_conf[:, :8]
+
+        left_hand_keypoints = array_kp[:, 8:29, :]
+        left_hand_conf = array_conf[:, 8:29]
+
+        right_hand_keypoints = array_kp[:, 29:, :]
+        right_hand_conf = array_conf[:, 29:]
+
+        item = {
+            "body_kp": body_keypoints_2d,
+            "body_conf": body_conf,
+            "left_hand_kp": left_hand_keypoints,
+            "left_hand_conf": left_hand_conf,
+            "right_hand_kp": right_hand_keypoints,
+            "right_hand_conf": right_hand_conf
+        }
+
+        return item
+
+    def pad(self, item):
+
+        pad_length = self.max_frames - item["body_kp"].shape[0]
+        if pad_length > 0:
+            for key in item.keys():
+                if "kp" in key:
+                    item[key] = numpy.pad(item[key], ((0, pad_length), (0,0), (0, 0)))
+                elif "conf" in key:
+                    item[key] = numpy.pad(item[key], ((0, pad_length), (0,0)))
+
+        return item
+
+    def clip(self, item):
+        item["body_kp"] = item["body_kp"][:self.max_frames]
+        item["right_hand_kp"] = item["right_hand_kp"][:self.max_frames]
+        item["left_hand_kp"] = item["left_hand_kp"][:self.max_frames]
+        item["body_conf"] = item["body_conf"][:self.max_frames]
+        item["right_hand_conf"] = item["right_hand_conf"][:self.max_frames]
+        item["left_hand_conf"] = item["left_hand_conf"][:self.max_frames]
+        # item["json_paths"] = item["json_paths"][:self.max_frames]
+
+        return item
+
+    def select_frames(self, all_jsons):
+        all_jsons = all_jsons[:self.max_frames]
+        return all_jsons
+
+    def to_tensor(self, item):
+        item["body_kp"] = torch.tensor(item["body_kp"]).float()
+        item["right_hand_kp"] = torch.tensor(item["right_hand_kp"]).float()
+        item["left_hand_kp"] = torch.tensor(item["left_hand_kp"]).float()
+        item["body_conf"] = torch.tensor(item["body_conf"]).float()
+        item["right_hand_conf"] = torch.tensor(item["right_hand_conf"]).float()
+        item["left_hand_conf"] = torch.tensor(item["left_hand_conf"]).float()
+
+        return item
+
+
+    def __getitem__(self, item):
+
+        utt_id = self.utt_ids[item]
+
+        keypoints = numpy.array(self.keypoints_data.get(utt_id))
+
+        item = self.array2item(keypoints)
+
+        item["text"] = self.utt_texts[utt_id]
+        n_frames = item["body_kp"].shape[0]
+        item["n_frames"] = min(n_frames, self.max_frames)
+        item["utt_id"] = utt_id
+        #
+        # self.n_tokens += len(tokens)
+        # self.n_utt += 1
+        # Pad sequence to max len
+        item = self.pad(item)
+
+        # Clip sequence to max len
+        # TODO This should not be needed since it is clipped in the all_jsons list
+        item = self.clip(item)
+
+        # To tensor
+        item = self.to_tensor(item)
+        if self.use_rand_tokens:
+            item["text_tokens"] = self.random_tokens
+
+        else:
+            tokens = self.tokenizer.encode(item["text"]).ids
+            tokens = tokens[:40]
+            tokens = tokens + [0] * (40 - len(tokens))
+            tokens = torch.tensor(tokens, dtype=torch.long)
+            item["text_tokens"] = tokens
+        if self.transform:
+            item = self.transform(item)
+
+        return item
+
+
+
+
