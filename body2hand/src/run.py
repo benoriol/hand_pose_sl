@@ -109,22 +109,22 @@ if __name__ == '__main__':
 
     if "Text" in args.model:
         print("Loading text dataset")
-        # train_dataset = FastTextPoseDataset(args.train_data, args.max_frames, transforms,
-        #                                     selection=args.frames_selection,
-        #                                     use_rand_tokens=args.rand_tokens)
-        # valid_dataset = FastTextPoseDataset(args.valid_data, args.max_frames, transforms,
-        #                                     selection=args.frames_selection,
-        #                                     use_rand_tokens=args.rand_tokens)
-        train_dataset = TextPoseH5Dataset(args.train_h5data,
-                                          args.train_textdata, args.max_frames,
-                                          transforms,
-                                          selection=args.frames_selection,
-                                          use_rand_tokens=args.rand_tokens)
-        valid_dataset = TextPoseH5Dataset(args.valid_h5data,
-                                          args.valid_textdata, args.max_frames,
-                                          transforms,
-                                          selection=args.frames_selection,
-                                          use_rand_tokens=args.rand_tokens)
+        train_dataset = FastTextPoseDataset(args.train_data, args.max_frames, transforms,
+                                            selection=args.frames_selection,
+                                            use_rand_tokens=args.rand_tokens)
+        valid_dataset = FastTextPoseDataset(args.valid_data, args.max_frames, transforms,
+                                            selection=args.frames_selection,
+                                            use_rand_tokens=args.rand_tokens)
+        # train_dataset = TextPoseH5Dataset(args.train_h5data,
+        #                                   args.train_textdata, args.max_frames,
+        #                                   transforms,
+        #                                   selection=args.frames_selection,
+        #                                   use_rand_tokens=args.rand_tokens)
+        # valid_dataset = TextPoseH5Dataset(args.valid_h5data,
+        #                                   args.valid_textdata, args.max_frames,
+        #                                   transforms,
+        #                                   selection=args.frames_selection,
+        #                                   use_rand_tokens=args.rand_tokens)
     else:
         print("Loading dataset without text")
         train_dataset = FastPoseDataset(args.train_data, args.max_frames, transforms)
